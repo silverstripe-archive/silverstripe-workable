@@ -17,11 +17,16 @@ class WorkableRestfulServiceFactory implements SilverStripe\Framework\Injector\F
 	 * @return RestfulService
 	 */
     public function create($service, array $params = []) {;
-    	$subdomain = $params[0];
+    	$config = Workable::config();
+    	$subdomain = $config->subdomain;
+
+    	if(!$subdomain) {
+    		throw new RuntimeException('You must set a Workable subdomain in the config (Workable.subdomain)');
+    	}
 
         $rest = new $service(
         	sprintf('https://www.workable.com/spi/v3/accounts/%s/',$subdomain),
-        	Config::inst()->get('Workable', 'cache_expiry')
+        	$config->cache_expiry
         );
 
         if(defined('WORKABLE_API_KEY')) {
