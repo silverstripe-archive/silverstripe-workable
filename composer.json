@@ -1,0 +1,19 @@
+{
+	"name":"silverstripe/workable",
+	"type": "silverstripe-module",
+	"description": "Adds Workable API integration to SilverStripe projects",
+	"keywords": ["silverstripe"],
+	"license": "BSD-3-Clause",
+	"homepage": "https://github.com/silverstripe/workable/",
+	"require": {
+        	"silverstripe/framework": ">=3.1.0"
+	},
+	"authors":[
+		{
+			"name": "Aaron Carlino",
+			"homepage": "http://leftandmain.com",
+			"email" : "aaron@silverstripe.com"
+		}
+
+	]
+}
