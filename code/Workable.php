@@ -84,14 +84,23 @@ class Workable_Result extends ViewableData {
 
 	/**
 	 * Magic getter that converts SilverStripe $UpperCamelCase to snake_case
-	 * e.g. $FullTitle gets full_title
+	 * e.g. $FullTitle gets full_title. You can also use dot-separated syntax, e.g. $Location.City
 	 * @param  string $prop
 	 * @return mixed
 	 */
-	public function __get($prop) {
-		$snaked = ltrim(strtolower(preg_replace('/[A-Z]/', '_$0', $prop)), '_');
+	public function __get($prop) {		
+		$snaked = ltrim(strtolower(preg_replace('/[A-Z]/', '_$0', $prop)), '_');			
 
-		return isset($this->apiData[$snaked]) ? $this->apiData[$snaked] : null;
+		if(!isset($this->apiData[$snaked])) {			
+			return null;
+		}
+		$data = $this->apiData[$snaked];
+
+		if(is_array($this->apiData[$snaked])) {
+			return new Workable_Result($data);
+		}
+
+		return $data;
 	}
 
 	/**

@@ -61,4 +61,11 @@ class WorkableTest extends SapphireTest {
 
 		$this->assertEquals($data->SnakeCase, 'foo');
 	}
+
+	public function testAcceptsDotSyntax () {
+		$data = new Workable_Result(['snake_case' => ['nested_property' => 'foo']]);
+		$result = $data->SnakeCase;
+		$this->assertInstanceOf('Workable_Result', $result);
+		$this->assertEquals($result->NestedProperty, 'foo');
+	}
 }
