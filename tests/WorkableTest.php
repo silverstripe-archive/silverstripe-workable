@@ -3,6 +3,7 @@
 class WorkableTest extends SapphireTest {
 
 	public function setUp() {
+		parent::setUp();
 		$config = Config::inst()->get('Injector','WorkableRestfulService');
 		$config['class'] = 'TestWorkableRestfulService';
 		Config::inst()->update('Injector','WorkableRestfulService', $config);
@@ -10,13 +11,6 @@ class WorkableTest extends SapphireTest {
 		Config::inst()->update('Workable', 'apiKey', 'test');
 		Config::inst()->update('Workable', 'subdomain', 'example');
 	}
-
-	// public function testThrowsIfNoAPIKey () {
-	// 	Config::inst()->remove('Workable','apiKey');
-	// 	$this->setExpectedException('RuntimeException');
-
-	// 	Workable::create();
-	// }
 
 	public function testThrowsIfNoSubdomain () {
 		Config::inst()->remove('Workable','subdomain');
@@ -37,15 +31,15 @@ class WorkableTest extends SapphireTest {
 	public function testGetsPublishedJobs () {
 		$result = Workable::create()->getJobs(['state' => 'published']);
 
-		$this->assertEquals($result->count(), 3);
-		$this->assertEquals($result->first()->Title, 'Published Job 1');
+		$this->assertEquals(3, $result->count());
+		$this->assertEquals('Published Job 1', $result->first()->Title);
 	}
 
 	public function testGetsUnpublishedJobs () {
 		$result = Workable::create()->getJobs(['state' => 'draft']);
 
-		$this->assertEquals($result->count(), 1);
-		$this->assertEquals($result->first()->Title, 'Draft Job 1');
+		$this->assertEquals(1, $result->count());
+		$this->assertEquals('Draft Job 1', $result->first()->Title);
 	}
 
 	public function testLogsError () {
@@ -54,18 +48,20 @@ class WorkableTest extends SapphireTest {
 		$result = Workable::create()->getJobs(['state' => 'fail']);
 
 		$this->assertNotNull($logger->event);
+
+		SS_Log::remove_writer($logger);
 	}
 
 	public function testConvertsSnakeCase () {
 		$data = new Workable_Result(['snake_case' => 'foo']);
 
-		$this->assertEquals($data->SnakeCase, 'foo');
+		$this->assertEquals('foo', $data->SnakeCase);
 	}
 
 	public function testAcceptsDotSyntax () {
 		$data = new Workable_Result(['snake_case' => ['nested_property' => 'foo']]);
 		$result = $data->SnakeCase;
 		$this->assertInstanceOf('Workable_Result', $result);
-		$this->assertEquals($result->NestedProperty, 'foo');
+		$this->assertEquals('foo', $result->NestedProperty);
 	}
 }
