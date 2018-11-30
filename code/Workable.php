@@ -1,113 +1,76 @@
 <?php
 
-/**
- * Defines the Workable API wrapper
- *
- * @package  silverstripe/workable
- * @author  Aaron Carlino <aaron@silverstripe.com>
- */
-class Workable extends Object {
+namespace SilverStripe\Workable;
 
-	/**
-	 * Reference to the RestfulService dependency
-	 * @var RestfulService
-	 */
-	protected $restulService;
+use RuntimeException;
+use GuzzleHttp\Client;
+use Psr\Log\LoggerInterface;
+use SilverStripe\Core\Convert;
+use SilverStripe\ORM\ArrayList;
+use SilverStripe\Core\Extensible;
+use SilverStripe\Core\Environment;
+use SilverStripe\Core\Injector\Injector;
+use SilverStripe\Core\Config\Configurable;
+use SilverStripe\Core\Injector\Injectable;
 
-	/**
-	 * Constructor, inject the restful service dependency
-	 * @param RestfulService $restfulService
-	 */
-	public function __construct($restfulService) {
-		$this->restfulService = $restfulService;
+class Workable
+{
+    use Extensible;
+    use Injectable;
+    use Configurable;
 
-		parent::__construct();
-	}
+    private static $cache_expiry = 3600;
 
-	/**
-	 * Gets all the jobs from the Workable API
-	 * @param  array  $params Array of params, e.g. ['state' => 'published']
-	 * @return ArrayList
-	 */
-	public function getJobs($params = []) {
-		$list = ArrayList::create();
-		$response = $this->callRestfulService('jobs', $params);
+    /**
+     * Gets all the jobs from the Workable API
+     * @param  array  $params Array of params, e.g. ['state' => 'published']
+     * @return ArrayList
+     */
+    public function getJobs($params = [])
+    {
+        $list = ArrayList::create();
+        $response = $this->callRestfulService('jobs', $params);
 
-		if($response && isset($response['jobs']) && is_array($response['jobs'])) {			
-			foreach($response['jobs'] as $record) {
-				$list->push(Workable_Result::create($record));
-			}
-		}
+        if ($response && isset($response['jobs']) && is_array($response['jobs'])) {
+            foreach ($response['jobs'] as $record) {
+                $list->push(WorkableResult::create($record));
+            }
+        }
 
-		return $list;
-	}
+        return $list;
+    }
 
-	/**
-	 * Wrapper method to configure the RestfulService, make the call, and handle errors
-	 * @param  string $url    
-	 * @param  array  $params 
-	 * @param  string $method 
-	 * @return array         JSON
-	 */
-	protected function callRestfulService($url, $params = [], $method = 'GET') {
-		$this->restfulService->setQueryString($params);
-		$response = $this->restfulService->request($url, $method, $params);
-		
-		if(!$response) {
-			SS_Log::log('No response from workable API endpoint ' . $url, SS_Log::WARN);
-			
-			return false;				
-		}
-		else if($response->getStatusCode() !== 200) {
-			SS_Log::log("Received non-200 status code {$response->getStatusCode()} from workable API", SS_Log::WARN);
+    /**
+     * Wrapper method to configure the RestfulService, make the call, and handle errors
+     * @param  string $url
+     * @param  array  $params
+     * @param  string $method
+     * @return array  JSON
+     */
+    public function callRestfulService($url, $params = [], $method = 'GET')
+    {
+        $apiKey = Environment::getEnv('WORKABLE_API_KEY');
+        $subdomain = static::config()->subdomain;
+        $logger = Injector::inst()->get(LoggerInterface::class);
 
-			return false;
-		}
+        if (!$apiKey) {
+            throw new RuntimeException('WORKABLE_API_KEY Environment variable not set');
+        }
 
-		return Convert::json2array($response->getBody());
-	}
+        if (!$subdomain) {
+            throw new RuntimeException(
+                'You must set a Workable subdomain in the config (SilverStripe\Workable\Workable.subdomain)'
+            );
+        }
 
-}
+        $client = new Client([
+            'base_uri' => sprintf('https://%s.workable.com/spi/v3/', $subdomain),
+            'headers' => [
+                'Authorization' => sprintf('Bearer %s', Environment::getEnv('WORKABLE_API_KEY')),
+            ]
+        ]);
+        $response = $client->request($method, $url, $params);
 
-
-/**
- * Defines the renderable Workable data for the template. Converts UpperCamelCase properties
- * to the snake_case that comes from the API
- */
-class Workable_Result extends ViewableData {
-
-	/**
-	 * Raw data from the API
-	 * @var array
-	 */
-	protected $apiData;
-
-	/**
-	 * Magic getter that converts SilverStripe $UpperCamelCase to snake_case
-	 * e.g. $FullTitle gets full_title. You can also use dot-separated syntax, e.g. $Location.City
-	 * @param  string $prop
-	 * @return mixed
-	 */
-	public function __get($prop) {		
-		$snaked = ltrim(strtolower(preg_replace('/[A-Z]/', '_$0', $prop)), '_');			
-
-		if(!isset($this->apiData[$snaked])) {			
-			return null;
-		}
-		$data = $this->apiData[$snaked];
-
-		if(is_array($this->apiData[$snaked])) {
-			return new Workable_Result($data);
-		}
-
-		return $data;
-	}
-
-	/**
-	 * constructor
-	 * @param array $apiData 
-	 */
-	public function __construct($apiData = []) {
-		$this->apiData = $apiData;
-	}
+        return Convert::json2array($response->getBody());
+    }
 }

@@ -1,67 +1,54 @@
 <?php
 
-class WorkableTest extends SapphireTest {
+namespace SilverStripe\Workable;
 
-	public function setUp() {
-		parent::setUp();
-		$config = Config::inst()->get('Injector','WorkableRestfulService');
-		$config['class'] = 'TestWorkableRestfulService';
-		Config::inst()->update('Injector','WorkableRestfulService', $config);
+use Psr\Log\LoggerInterface;
+use SilverStripe\Core\Environment;
+use SilverStripe\Dev\SapphireTest;
+use SilverStripe\Workable\Workable;
+use SilverStripe\Core\Config\Config;
+use SilverStripe\Core\Injector\Injector;
+use SilverStripe\Workable\WorkableResult;
+use SilverStripe\Workable\TestWorkableRestfulService;
 
-		Config::inst()->update('Workable', 'apiKey', 'test');
-		Config::inst()->update('Workable', 'subdomain', 'example');
-	}
+class WorkableTest extends SapphireTest
+{
+    public function setUp()
+    {
+        parent::setUp();
 
-	public function testThrowsIfNoSubdomain () {
-		Config::inst()->remove('Workable','subdomain');
-		$this->setExpectedException('RuntimeException');
+        Environment::setEnv('WORKABLE_API_KEY', 'test');
+        Config::inst()->update(Workable::class, 'subdomain', 'example');
+    }
 
-		Workable::create();
-	}
+    public function testThrowsIfNoSubdomain()
+    {
+        Config::inst()->remove(Workable::class, 'subdomain');
+        $this->setExpectedException('RuntimeException');
 
-	public function testWillUseAPIKeyConstant () {
-		Config::inst()->remove('Workable','apiKey');
-		if(!defined('WORKABLE_API_KEY')) {
-			define('WORKABLE_API_KEY','test');	
-		}
-		
-		Workable::create();
-	}
+        Workable::create()->callRestfulService('test');
+    }
 
-	public function testGetsPublishedJobs () {
-		$result = Workable::create()->getJobs(['state' => 'published']);
+    public function testThrowsIfNoApiKey()
+    {
+        Environment::setEnv('WORKABLE_API_KEY', null);
+        $this->setExpectedException('RuntimeException');
 
-		$this->assertEquals(3, $result->count());
-		$this->assertEquals('Published Job 1', $result->first()->Title);
-	}
+        Workable::create()->callRestfulService('test');
+    }
 
-	public function testGetsUnpublishedJobs () {
-		$result = Workable::create()->getJobs(['state' => 'draft']);
+    public function testConvertsSnakeCase()
+    {
+        $data = WorkableResult::create(['snake_case' => 'foo']);
 
-		$this->assertEquals(1, $result->count());
-		$this->assertEquals('Draft Job 1', $result->first()->Title);
-	}
+        $this->assertEquals('foo', $data->SnakeCase);
+    }
 
-	public function testLogsError () {
-		$logger = new TestWorkableLogger();
-		SS_Log::add_writer($logger);
-		$result = Workable::create()->getJobs(['state' => 'fail']);
-
-		$this->assertNotNull($logger->event);
-
-		SS_Log::remove_writer($logger);
-	}
-
-	public function testConvertsSnakeCase () {
-		$data = new Workable_Result(['snake_case' => 'foo']);
-
-		$this->assertEquals('foo', $data->SnakeCase);
-	}
-
-	public function testAcceptsDotSyntax () {
-		$data = new Workable_Result(['snake_case' => ['nested_property' => 'foo']]);
-		$result = $data->SnakeCase;
-		$this->assertInstanceOf('Workable_Result', $result);
-		$this->assertEquals('foo', $result->NestedProperty);
-	}
+    public function testAcceptsDotSyntax()
+    {
+        $data = WorkableResult::create(['snake_case' => ['nested_property' => 'foo']]);
+        $result = $data->SnakeCase;
+        $this->assertInstanceOf(WorkableResult::class, $result);
+        $this->assertEquals('foo', $result->NestedProperty);
+    }
 }

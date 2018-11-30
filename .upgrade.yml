@@ -1,0 +1,7 @@
+mappings:
+  WorkableTest: SilverStripe\Workable\WorkableTest
+  TestWorkableRestfulService: SilverStripe\Workable\TestWorkableRestfulService
+  TestWorkableLogger: SilverStripe\Workable\TestWorkableLogger
+  Workable: SilverStripe\Workable\Workable
+  Workable_Result: SilverStripe\Workable\Workable_Result
+  WorkableRestfulServiceFactory: SilverStripe\Workable\WorkableRestfulServiceFactory

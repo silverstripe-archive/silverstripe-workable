@@ -1,12 +1,5 @@
 ---
 Name: workable
 ---
-Workable:
+SilverStripe\Workable\Workable:
   cache_expiry: 3600
-Injector:
-  Workable:    
-    constructor:
-      0: %$WorkableRestfulService
-  WorkableRestfulService:
-    class: RestfulService
-    factory: WorkableRestfulServiceFactory
