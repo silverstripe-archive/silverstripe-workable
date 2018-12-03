@@ -3,14 +3,12 @@
 namespace SilverStripe\Workable;
 
 use RuntimeException;
-use GuzzleHttp\Client;
 use Psr\Log\LoggerInterface;
 use SilverStripe\Core\Convert;
 use SilverStripe\ORM\ArrayList;
 use SilverStripe\Core\Flushable;
 use SilverStripe\View\ArrayData;
 use SilverStripe\Core\Extensible;
-use SilverStripe\Core\Environment;
 use Psr\SimpleCache\CacheInterface;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Core\Config\Configurable;
@@ -21,6 +19,21 @@ class Workable implements Flushable
     use Extensible;
     use Injectable;
     use Configurable;
+
+    /**
+     * Reference to the RestfulService dependency
+     * @var RestfulService
+     */
+    protected $restulService;
+
+    /**
+     * Constructor, inject the restful service dependency
+     * @param RestfulService $restfulService
+     */
+    public function __construct($restfulService)
+    {
+        $this->restfulService = $restfulService;
+    }
 
     /**
      * Gets all the jobs from the Workable API
@@ -113,27 +126,7 @@ class Workable implements Flushable
      */
     public function callRestfulService($url, $params = [], $method = 'GET')
     {
-        $apiKey = Environment::getEnv('WORKABLE_API_KEY');
-        $subdomain = static::config()->subdomain;
-
-        if (!$apiKey) {
-            throw new RuntimeException('WORKABLE_API_KEY Environment variable not set');
-        }
-
-        if (!$subdomain) {
-            throw new RuntimeException(
-                'You must set a Workable subdomain in the config (SilverStripe\Workable\Workable.subdomain)'
-            );
-        }
-
-        $client = new Client([
-            'base_uri' => sprintf('https://%s.workable.com/spi/v3/', $subdomain),
-            'headers' => [
-                'Authorization' => sprintf('Bearer %s', Environment::getEnv('WORKABLE_API_KEY')),
-            ],
-            'query' => $params,
-        ]);
-        $response = $client->request($method, $url);
+        $response = $this->restfulService->request($method, $url, ['query' => $params]);
 
         return Convert::json2array($response->getBody());
     }

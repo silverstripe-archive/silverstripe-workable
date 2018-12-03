@@ -7,3 +7,9 @@ SilverStripe\Core\Injector\Injector:
     constructor:
       namespace: 'workable'
       defaultLifetime: 3600
+  SilverStripe\Workable\Workable:
+    constructor:
+      0: %$WorkableRestfulService
+  WorkableRestfulService:
+    class: GuzzleHttp\Client
+    factory: SilverStripe\Workable\WorkableRestfulServiceFactory
