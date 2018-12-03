@@ -1,5 +1,9 @@
 ---
 Name: workable
 ---
-SilverStripe\Workable\Workable:
-  cache_expiry: 3600
+SilverStripe\Core\Injector\Injector:
+  Psr\SimpleCache\CacheInterface.workable:
+    factory: SilverStripe\Core\Cache\CacheFactory
+    constructor:
+      namespace: 'workable'
+      defaultLifetime: 3600
