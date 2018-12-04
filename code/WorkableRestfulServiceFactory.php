@@ -2,6 +2,7 @@
 
 namespace SilverStripe\Workable;
 
+use RuntimeException;
 use SilverStripe\Core\Environment;
 use SilverStripe\Workable\Workable;
 use SilverStripe\Core\Injector\Factory;
