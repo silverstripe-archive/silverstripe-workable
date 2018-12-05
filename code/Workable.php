@@ -56,9 +56,9 @@ class Workable implements Flushable
             foreach ($response['jobs'] as $record) {
                 $list->push(WorkableResult::create($record));
             }
-        }
 
-        $cache->set($cacheKey, $list);
+            $cache->set($cacheKey, $list);
+        }
 
         return $list;
     }
@@ -82,9 +82,8 @@ class Workable implements Flushable
 
         if ($response && isset($response['id'])) {
             $job = WorkableResult::create($response);
+            $cache->set($cacheKey, $job);
         }
-
-        $cache->set($cacheKey, $job);
 
         return $job;
     }
@@ -111,9 +110,9 @@ class Workable implements Flushable
                 $job = $this->getJob($record['shortcode'], $params);
                 $list->push($job);
             }
-        }
 
-        $cache->set($cacheKey, $list);
+            $cache->set($cacheKey, $list);
+        }
 
         return $list;
     }
