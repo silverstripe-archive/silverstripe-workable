@@ -2,6 +2,7 @@
 
 namespace SilverStripe\Workable;
 
+use Monolog\Logger;
 use RuntimeException;
 use Psr\Log\LoggerInterface;
 use SilverStripe\Core\Convert;
@@ -126,7 +127,15 @@ class Workable implements Flushable
      */
     public function callRestfulService($url, $params = [], $method = 'GET')
     {
-        $response = $this->restfulService->request($method, $url, ['query' => $params]);
+        try {
+            $response = $this->restfulService->request($method, $url, ['query' => $params]);
+        } catch (\RuntimeException $e) {
+            Injector::inst()->get(LoggerInterface::class)->warning(
+                'Failed to retreive valid response from workable',
+                ['exception' => $e]
+            );
+            return [];
+        }
 
         return Convert::json2array($response->getBody());
     }
