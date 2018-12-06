@@ -60,6 +60,15 @@ class WorkableTest extends SapphireTest
         $data = Workable::create()->getJobs();
 
         $this->assertCount(2, $data);
+        $this->assertEquals('Job 1', $data[0]->title);
+        $this->assertEquals('Job 2', $data[1]->title);
+    }
+
+    public function testGetJobsWithDraftState()
+    {
+        $data = Workable::create()->getJobs(['state' => 'draft']);
+
+        $this->assertCount(1, $data);
     }
 
     public function testGetJob()
@@ -68,6 +77,15 @@ class WorkableTest extends SapphireTest
 
         $this->assertNotNull($data);
         $this->assertEquals('Job x', $data->title);
+        $this->assertEquals('GROOV001', $data->shortcode);
+    }
+
+    public function testGetJobWithDraftState()
+    {
+        $data = Workable::create()->getJob('GROOV001', ['state' => 'draft']);
+
+        $this->assertNotNull($data);
+        $this->assertEquals('Draft Job x', $data->title);
         $this->assertEquals('GROOV001', $data->shortcode);
     }
 
@@ -80,5 +98,15 @@ class WorkableTest extends SapphireTest
         $this->assertEquals('GROOV001', $data[0]->shortcode);
         $this->assertEquals('full data', $data[1]->test);
         $this->assertEquals('GROOV002', $data[1]->shortcode);
+    }
+
+    public function testFullJobsWithDraftState()
+    {
+        $data = Workable::create()->getFullJobs(['state' => 'draft']);
+
+        $this->assertCount(1, $data);
+        $this->assertEquals('Draft Job x', $data[0]->title);
+        $this->assertEquals('full draft data', $data[0]->test);
+        $this->assertEquals('GROOV001', $data[0]->shortcode);
     }
 }

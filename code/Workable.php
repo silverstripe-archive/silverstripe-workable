@@ -38,19 +38,21 @@ class Workable implements Flushable
 
     /**
      * Gets all the jobs from the Workable API
-     * @param  array  $params Array of params, e.g. ['state' => 'published']
+     * @param  array  $params Array of params, e.g. ['state' => 'published'].
+     *                        see https://workable.readme.io/docs/jobs for full list of query params
      * @return ArrayList
      */
     public function getJobs($params = [])
     {
         $cache = Injector::inst()->get(CacheInterface::class . '.workable');
-        $cacheKey = 'Jobs';
-        $list = ArrayList::create();
-        $response = $this->callRestfulService('jobs', $params);
+        $cacheKey = 'Jobs' . implode($params, '-');
 
         if ($cache->has($cacheKey)) {
             return $cache->get($cacheKey);
         }
+
+        $list = ArrayList::create();
+        $response = $this->callRestfulService('jobs', $params);
 
         if ($response && isset($response['jobs']) && is_array($response['jobs'])) {
             foreach ($response['jobs'] as $record) {
@@ -66,19 +68,21 @@ class Workable implements Flushable
     /**
      * Gets information on a specific job form the Workable API
      * @param  string $shortcode Workable shortcode for the job, e.g. 'GROOV005'
-     * @param  array  $params    Array of params, e.g. ['state' => 'published']
+     * @param  array  $params    Array of params, e.g. ['state' => 'published'].
+     *                           see https://workable.readme.io/docs/jobs for full list of query params
      * @return WorkableResult|null
      */
     public function getJob($shortcode, $params = [])
     {
-        $job = null;
         $cache = Injector::inst()->get(CacheInterface::class . '.workable');
-        $cacheKey = 'Job-' . $shortcode;
-        $response = $this->callRestfulService('jobs/' . $shortcode, $params);
+        $cacheKey = 'Job-' . $shortcode . implode($params, '-');
 
         if ($cache->has($cacheKey)) {
             return $cache->get($cacheKey);
         }
+
+        $job = null;
+        $response = $this->callRestfulService('jobs/' . $shortcode, $params);
 
         if ($response && isset($response['id'])) {
             $job = WorkableResult::create($response);
@@ -90,20 +94,23 @@ class Workable implements Flushable
 
     /**
      * Gets all the jobs from the workable API, populating each job with its full data
-     * Note: This calls the API multiple times so should be used with caution.
-     * @param  array  $params Array of params, e.g. ['state' => 'published']
+     * Note: This calls the API multiple times so should be used with caution, see
+     * rate limiting docs https://workable.readme.io/docs/rate-limits
+     * @param  array  $params Array of params, e.g. ['state' => 'published'].
+     *                        see https://workable.readme.io/docs/jobs for full list of query params
      * @return ArrayList
      */
     public function getFullJobs($params = [])
     {
         $cache = Injector::inst()->get(CacheInterface::class . '.workable');
-        $cacheKey = 'FullJobs';
-        $list = ArrayList::create();
-        $response = $this->callRestfulService('jobs', $params);
+        $cacheKey = 'FullJobs' . implode($params, '-');
 
         if ($cache->has($cacheKey)) {
             return $cache->get($cacheKey);
         }
+
+        $list = ArrayList::create();
+        $response = $this->callRestfulService('jobs', $params);
 
         if ($response && isset($response['jobs']) && is_array($response['jobs'])) {
             foreach ($response['jobs'] as $record) {

@@ -10,34 +10,68 @@ class TestWorkableRestfulService
     {
         switch ($url) {
             case 'jobs':
-                return $this->getMockJobs();
+                return $this->getMockJobs($params);
             case 'jobs/GROOV001':
             case 'jobs/GROOV002':
-                return $this->getMockJob($url);
+                return $this->getMockJob($url, $params);
         }
     }
 
-    protected function getMockJobs()
+    protected function getMockJobs($params)
     {
-        return new Response(200, [], json_encode(['jobs' => [
-            [
-                'title' => 'Job 1',
-                'shortcode' => 'GROOV001',
-            ],
-            [
-                'title' => 'Job 2',
-                'shortcode' => 'GROOV002',
-            ],
-        ]]));
+        $state = isset($params['query']['state']) ? $params['query']['state'] : '';
+        $response = [];
+
+        switch ($state) {
+            case 'draft':
+                $response = ['jobs' => [
+                    [
+                        'title' => 'draft job',
+                        'shortcode' => 'GROOV001',
+                    ],
+                ]];
+                break;
+            default:
+                $response = ['jobs' => [
+                    [
+                        'title' => 'Job 1',
+                        'shortcode' => 'GROOV001',
+                    ],
+                    [
+                        'title' => 'Job 2',
+                        'shortcode' => 'GROOV002',
+                    ],
+                ]];
+                break;
+        }
+
+        return new Response(200, [], json_encode($response));
     }
 
-    protected function getMockJob($url)
+    protected function getMockJob($url, $params)
     {
-        return new Response(200, [], json_encode([
-            'title' => 'Job x',
-            'test' => 'full data',
-            'id' => 1,
-            'shortcode' => substr($url, 5),
-        ]));
+        $state = isset($params['query']['state']) ? $params['query']['state'] : '';
+        $response = [];
+
+        switch ($state) {
+            case 'draft':
+                $response = [
+                    'title' => 'Draft Job x',
+                    'test' => 'full draft data',
+                    'id' => 1,
+                    'shortcode' => substr($url, 5),
+                ];
+                break;
+            default:
+                $response = [
+                    'title' => 'Job x',
+                    'test' => 'full data',
+                    'id' => 1,
+                    'shortcode' => substr($url, 5),
+                ];
+                break;
+        }
+
+        return new Response(200, [], json_encode($response));
     }
 }
