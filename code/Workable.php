@@ -25,15 +25,23 @@ class Workable implements Flushable
      * Reference to the RestfulService dependency
      * @var RestfulService
      */
-    protected $restulService;
+    protected $restfulService;
+
+    /**
+     * Reference to the Cache dependency
+     * @var CacheInterface
+     */
+    protected $cache;
 
     /**
      * Constructor, inject the restful service dependency
      * @param RestfulService $restfulService
+     * @param CacheInterface $cache
      */
-    public function __construct($restfulService)
+    public function __construct($restfulService, $cache)
     {
         $this->restfulService = $restfulService;
+        $this->cache = $cache;
     }
 
     /**
@@ -44,11 +52,10 @@ class Workable implements Flushable
      */
     public function getJobs($params = [])
     {
-        $cache = Injector::inst()->get(CacheInterface::class . '.workable');
         $cacheKey = 'Jobs' . implode($params, '-');
 
-        if ($cache->has($cacheKey)) {
-            return $cache->get($cacheKey);
+        if ($this->cache->has($cacheKey)) {
+            return $this->cache->get($cacheKey);
         }
 
         $list = ArrayList::create();
@@ -59,7 +66,7 @@ class Workable implements Flushable
                 $list->push(WorkableResult::create($record));
             }
 
-            $cache->set($cacheKey, $list);
+            $this->cache->set($cacheKey, $list);
         }
 
         return $list;
@@ -74,11 +81,10 @@ class Workable implements Flushable
      */
     public function getJob($shortcode, $params = [])
     {
-        $cache = Injector::inst()->get(CacheInterface::class . '.workable');
         $cacheKey = 'Job-' . $shortcode . implode($params, '-');
 
-        if ($cache->has($cacheKey)) {
-            return $cache->get($cacheKey);
+        if ($this->cache->has($cacheKey)) {
+            return $this->cache->get($cacheKey);
         }
 
         $job = null;
@@ -86,7 +92,7 @@ class Workable implements Flushable
 
         if ($response && isset($response['id'])) {
             $job = WorkableResult::create($response);
-            $cache->set($cacheKey, $job);
+            $this->cache->set($cacheKey, $job);
         }
 
         return $job;
@@ -102,11 +108,10 @@ class Workable implements Flushable
      */
     public function getFullJobs($params = [])
     {
-        $cache = Injector::inst()->get(CacheInterface::class . '.workable');
         $cacheKey = 'FullJobs' . implode($params, '-');
 
-        if ($cache->has($cacheKey)) {
-            return $cache->get($cacheKey);
+        if ($this->cache->has($cacheKey)) {
+            return $this->cache->get($cacheKey);
         }
 
         $list = ArrayList::create();
@@ -118,7 +123,7 @@ class Workable implements Flushable
                 $list->push($job);
             }
 
-            $cache->set($cacheKey, $list);
+            $this->cache->set($cacheKey, $list);
         }
 
         return $list;
@@ -129,7 +134,7 @@ class Workable implements Flushable
      * @param  string $url
      * @param  array  $params
      * @param  string $method
-     * @return array  JSON
+     * @return array  JSON as array
      */
     public function callRestfulService($url, $params = [], $method = 'GET')
     {
@@ -137,13 +142,13 @@ class Workable implements Flushable
             $response = $this->restfulService->request($method, $url, ['query' => $params]);
         } catch (\RuntimeException $e) {
             Injector::inst()->get(LoggerInterface::class)->warning(
-                'Failed to retreive valid response from workable',
+                'Failed to retrieve valid response from workable',
                 ['exception' => $e]
             );
             return [];
         }
 
-        return Convert::json2array($response->getBody());
+        return json_decode($response->getBody(), true);
     }
 
     /**
@@ -151,7 +156,6 @@ class Workable implements Flushable
      */
     public static function flush()
     {
-        $cache = Injector::inst()->get(CacheInterface::class . '.workable');
-        $cache->clear();
+        $this->cache->clear();
     }
 }
