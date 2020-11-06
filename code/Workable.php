@@ -156,6 +156,7 @@ class Workable implements Flushable
      */
     public static function flush()
     {
-        $this->cache->clear();
+        $cache = Injector::inst()->get(CacheInterface::class . '.workable');
+        $cache->clear();
     }
 }
