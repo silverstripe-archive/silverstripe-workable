@@ -10,6 +10,7 @@ SilverStripe\Core\Injector\Injector:
   SilverStripe\Workable\Workable:
     constructor:
       0: %$WorkableRestfulService
+      1: %$Psr\SimpleCache\CacheInterface.workable
   WorkableRestfulService:
     class: GuzzleHttp\Client
     factory: SilverStripe\Workable\WorkableRestfulServiceFactory
