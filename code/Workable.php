@@ -52,8 +52,7 @@ class Workable implements Flushable
      */
     public function getJobs($params = [])
     {
-        $cacheKey = 'Jobs' . implode($params, '-');
-
+        $cacheKey = 'Jobs' . implode('-', $params);
         if ($this->cache->has($cacheKey)) {
             return $this->cache->get($cacheKey);
         }
@@ -81,7 +80,7 @@ class Workable implements Flushable
      */
     public function getJob($shortcode, $params = [])
     {
-        $cacheKey = 'Job-' . $shortcode . implode($params, '-');
+        $cacheKey = 'Job-' . $shortcode . implode('-', $params);
 
         if ($this->cache->has($cacheKey)) {
             return $this->cache->get($cacheKey);
@@ -108,7 +107,7 @@ class Workable implements Flushable
      */
     public function getFullJobs($params = [])
     {
-        $cacheKey = 'FullJobs' . implode($params, '-');
+        $cacheKey = 'FullJobs' . implode('-', $params);
 
         if ($this->cache->has($cacheKey)) {
             return $this->cache->get($cacheKey);
