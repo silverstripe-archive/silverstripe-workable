@@ -5,7 +5,6 @@ namespace SilverStripe\Workable;
 use Monolog\Logger;
 use RuntimeException;
 use Psr\Log\LoggerInterface;
-use SilverStripe\Core\Convert;
 use SilverStripe\ORM\ArrayList;
 use SilverStripe\Core\Flushable;
 use SilverStripe\View\ArrayData;
@@ -25,20 +24,32 @@ class Workable implements Flushable
      * Reference to the RestfulService dependency
      * @var RestfulService
      */
-    protected $restfulService;
+    private $restfulService;
 
     /**
      * Reference to the Cache dependency
      * @var CacheInterface
      */
-    protected $cache;
+    private $cache;
+
+    /**
+     * API key used to connect to Workable, set via WORKABLE_API_KEY env var or in config
+     * @config
+     */
+    private $apiKey;
+
+    /**
+     * Subdomain for Workable API call (e.g. $subdomain.workable.com)
+     * @config
+     */
+    private $subdomain;
 
     /**
      * Constructor, inject the restful service dependency
      * @param RestfulService $restfulService
      * @param CacheInterface $cache
      */
-    public function __construct($restfulService, $cache)
+    public function __construct(RestfulService $restfulService, CacheInterface $cache)
     {
         $this->restfulService = $restfulService;
         $this->cache = $cache;
@@ -50,7 +61,7 @@ class Workable implements Flushable
      *                        see https://workable.readme.io/docs/jobs for full list of query params
      * @return ArrayList
      */
-    public function getJobs($params = [])
+    public function getJobs(array $params = []): ArrayList
     {
         $cacheKey = 'Jobs' . implode('-', $params);
         if ($this->cache->has($cacheKey)) {
@@ -60,13 +71,16 @@ class Workable implements Flushable
         $list = ArrayList::create();
         $response = $this->callRestfulService('jobs', $params);
 
-        if ($response && isset($response['jobs']) && is_array($response['jobs'])) {
-            foreach ($response['jobs'] as $record) {
-                $list->push(WorkableResult::create($record));
-            }
-
-            $this->cache->set($cacheKey, $list);
+        if (!$response) {
+            return $list;
         }
+
+        $jobs = $response['jobs'] ?? [];
+        foreach ($jobs as $record) {
+            $list->push(WorkableResult::create($record));
+        }
+
+        $this->cache->set($cacheKey, $list);
 
         return $list;
     }
@@ -78,7 +92,7 @@ class Workable implements Flushable
      *                           see https://workable.readme.io/docs/jobs for full list of query params
      * @return WorkableResult|null
      */
-    public function getJob($shortcode, $params = [])
+    public function getJob(string $shortcode, array $params = []): ?WorkableResult
     {
         $cacheKey = 'Job-' . $shortcode . implode('-', $params);
 
@@ -116,14 +130,17 @@ class Workable implements Flushable
         $list = ArrayList::create();
         $response = $this->callRestfulService('jobs', $params);
 
-        if ($response && isset($response['jobs']) && is_array($response['jobs'])) {
-            foreach ($response['jobs'] as $record) {
-                $job = $this->getJob($record['shortcode'], $params);
-                $list->push($job);
-            }
-
-            $this->cache->set($cacheKey, $list);
+        if (!$response) {
+            return $list;
         }
+
+        $jobs = $response['jobs'] ?? [];
+        foreach ($jobs as $record) {
+            $job = $this->getJob($record['shortcode'], $params);
+            $list->push($job);
+        }
+
+        $this->cache->set($cacheKey, $list);
 
         return $list;
     }
@@ -135,7 +152,7 @@ class Workable implements Flushable
      * @param  string $method
      * @return array  JSON as array
      */
-    public function callRestfulService($url, $params = [], $method = 'GET')
+    public function callRestfulService(string $url, array $params = [], string $method = 'GET'): array
     {
         try {
             $response = $this->restfulService->request($method, $url, ['query' => $params]);
@@ -155,7 +172,7 @@ class Workable implements Flushable
      */
     public static function flush()
     {
-        $cache = Injector::inst()->get(CacheInterface::class . '.workable');
+        $cache = static::singleton()->getCache();
         $cache->clear();
     }
 }

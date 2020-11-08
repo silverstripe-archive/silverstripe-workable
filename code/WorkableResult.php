@@ -26,10 +26,7 @@ class WorkableResult extends ViewableData
     {
         $snaked = ltrim(strtolower(preg_replace('/[A-Z]/', '_$0', $prop)), '_');
 
-        if (!isset($this->apiData[$snaked])) {
-            return null;
-        }
-        $data = $this->apiData[$snaked];
+        $data = $this->apiData[$snaked] ?? null;
 
         if (is_array($this->apiData[$snaked])) {
             return new WorkableResult($data);
