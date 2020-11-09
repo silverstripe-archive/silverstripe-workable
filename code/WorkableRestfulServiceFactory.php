@@ -2,6 +2,7 @@
 
 namespace SilverStripe\Workable;
 
+use GuzzleHttp\ClientInterface;
 use RuntimeException;
 use SilverStripe\Workable\Workable;
 use SilverStripe\Core\Injector\Factory;
@@ -16,30 +17,42 @@ use SilverStripe\Core\Injector\Factory;
  */
 class WorkableRestfulServiceFactory implements Factory
 {
+    /**
+     * Set via ENV variable WORKABLE_API_KEY (see config.yml)
+     * @var string
+     */
+    private $apiKey;
 
-
+    public function __construct(?string $apiKey)
+    {
+        $this->apiKey = $apiKey;
+    }
     /**
      * Create the RestfulService (or whatever dependency you've injected)
-     * @return RestfulService
+     *
+     * @throws RuntimeException
+     *
+     * @return ClientInterface
      */
     public function create($service, array $params = [])
     {
-        $config = Workable::config();
 
-        if (!$config->apiKey) {
+        if (!$this->apiKey) {
             throw new RuntimeException('WORKABLE_API_KEY Environment variable not set');
         }
 
-        if (!$config->subdomain) {
+        $subdomain = Workable::config()->subdomain;
+
+        if (!$subdomain) {
             throw new RuntimeException(
                 'You must set a Workable subdomain in the config (SilverStripe\Workable\Workable.subdomain)'
             );
         }
 
         return new $service([
-            'base_uri' => sprintf('https://%s.workable.com/spi/v3/', $config->subdomain),
+            'base_uri' => sprintf('https://%s.workable.com/spi/v3/', $subdomain),
             'headers' => [
-                'Authorization' => sprintf('Bearer %s', $config->apiKey),
+                'Authorization' => sprintf('Bearer %s', $this->apiKey),
             ],
         ]);
     }

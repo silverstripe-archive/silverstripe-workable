@@ -2,6 +2,8 @@
 
 namespace SilverStripe\Workable;
 
+use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\ClientException;
 use Monolog\Logger;
 use RuntimeException;
 use Psr\Log\LoggerInterface;
@@ -21,22 +23,16 @@ class Workable implements Flushable
     use Configurable;
 
     /**
-     * Reference to the RestfulService dependency
-     * @var RestfulService
+     * Reference to the HTTP Client dependency
+     * @var ClientInterface
      */
-    private $restfulService;
+    private $httpClient;
 
     /**
      * Reference to the Cache dependency
      * @var CacheInterface
      */
     private $cache;
-
-    /**
-     * API key used to connect to Workable, set via WORKABLE_API_KEY env var or in config
-     * @config
-     */
-    private $apiKey;
 
     /**
      * Subdomain for Workable API call (e.g. $subdomain.workable.com)
@@ -46,12 +42,12 @@ class Workable implements Flushable
 
     /**
      * Constructor, inject the restful service dependency
-     * @param RestfulService $restfulService
+     * @param ClientInterface $httpClient
      * @param CacheInterface $cache
      */
-    public function __construct(RestfulService $restfulService, CacheInterface $cache)
+    public function __construct(ClientInterface $httpClient, CacheInterface $cache)
     {
-        $this->restfulService = $restfulService;
+        $this->httpClient = $httpClient;
         $this->cache = $cache;
     }
 
@@ -69,7 +65,7 @@ class Workable implements Flushable
         }
 
         $list = ArrayList::create();
-        $response = $this->callRestfulService('jobs', $params);
+        $response = $this->callHttpClient('jobs', $params);
 
         if (!$response) {
             return $list;
@@ -101,7 +97,7 @@ class Workable implements Flushable
         }
 
         $job = null;
-        $response = $this->callRestfulService('jobs/' . $shortcode, $params);
+        $response = $this->callHttpClient('jobs/' . $shortcode, $params);
 
         if ($response && isset($response['id'])) {
             $job = WorkableResult::create($response);
@@ -128,7 +124,7 @@ class Workable implements Flushable
         }
 
         $list = ArrayList::create();
-        $response = $this->callRestfulService('jobs', $params);
+        $response = $this->callHttpClient('jobs', $params);
 
         if (!$response) {
             return $list;
@@ -150,29 +146,56 @@ class Workable implements Flushable
      * @param  string $url
      * @param  array  $params
      * @param  string $method
+     *
+     * @throws RuntimeException if client is not configured correctly
+     * @throws ClientException if request fails
+     *
      * @return array  JSON as array
      */
-    public function callRestfulService(string $url, array $params = [], string $method = 'GET'): array
+    public function callHttpClient(string $url, array $params = [], string $method = 'GET'): array
     {
         try {
-            $response = $this->restfulService->request($method, $url, ['query' => $params]);
+            $response = $this->httpClient->request($method, $url, ['query' => $params]);
         } catch (\RuntimeException $e) {
             Injector::inst()->get(LoggerInterface::class)->warning(
                 'Failed to retrieve valid response from workable',
                 ['exception' => $e]
             );
-            return [];
+
+            throw $e;
         }
 
         return json_decode($response->getBody(), true);
     }
 
     /**
-     * Clear the cache when flush is called
+     * Flush any cached data
      */
     public static function flush()
     {
-        $cache = static::singleton()->getCache();
-        $cache->clear();
+        static::singleton()->getCache()->clear();
+    }
+
+    /**
+     * @return CacheInterface
+     */
+    public function getCache(): CacheInterface
+    {
+        if (!$this->cache) {
+            $this->setCache(Injector::inst()->get(CacheInterface::class . '.workable'));
+        }
+
+        return $this->cache;
+    }
+
+    /**
+     * @param CacheInterface $cache
+     * @return self
+     */
+    public function setCache(CacheInterface $cache): self
+    {
+        $this->cache = $cache;
+
+        return $this;
     }
 }
