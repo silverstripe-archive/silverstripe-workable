@@ -28,7 +28,7 @@ class WorkableResult extends ViewableData
 
         $data = $this->apiData[$snaked] ?? null;
 
-        if (is_array($this->apiData[$snaked])) {
+        if (is_array($data)) {
             return new WorkableResult($data);
         }
 

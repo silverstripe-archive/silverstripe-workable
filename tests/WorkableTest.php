@@ -2,26 +2,37 @@
 
 namespace SilverStripe\Workable\Tests;
 
+use GuzzleHttp\ClientInterface;
 use Psr\Log\LoggerInterface;
+use Psr\SimpleCache\CacheInterface;
+use SilverStripe\Config\Collections\CachedConfigCollection;
+use SilverStripe\Core\Cache\DefaultCacheFactory;
 use SilverStripe\Core\Environment;
+use SilverStripe\Core\Injector\InjectorLoader;
 use SilverStripe\Dev\SapphireTest;
+use SilverStripe\Versioned\Caching\VersionedCacheAdapter;
+use SilverStripe\Workable\Tests\TestWorkableRestfulService;
 use SilverStripe\Workable\Workable;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Core\Injector\Injector;
+use SilverStripe\Workable\WorkableRestfulServiceFactory;
 use SilverStripe\Workable\WorkableResult;
-use SilverStripe\Workable\Tests\TestWorkableRestfulService;
 
 class WorkableTest extends SapphireTest
 {
-    public function setUp()
+    public static function setUpBeforeClass()
+    {
+        parent::setUpBeforeClass();
+        Workable::config()->set('subdomain', 'example');
+        $config = Config::inst()->get(Injector::class, 'GuzzleHttp\ClientInterface.workable');
+        $config['class'] = TestWorkableRestfulService::class;
+        Config::inst()->merge(Injector::class, 'GuzzleHttp\ClientInterface.workable', $config);
+    }
+
+    protected function setUp()
     {
         parent::setUp();
-        $config = Config::inst()->get(Injector::class, 'WorkableRestfulService');
-        $config['class'] = TestWorkableRestfulService::class;
-        Config::inst()->update(Injector::class, 'WorkableRestfulService', $config);
-
         Environment::setEnv('WORKABLE_API_KEY', 'test');
-        Config::inst()->update(Workable::class, 'subdomain', 'example');
     }
 
     public function testThrowsIfNoSubdomain()
@@ -29,7 +40,7 @@ class WorkableTest extends SapphireTest
         Config::inst()->remove(Workable::class, 'subdomain');
         $this->setExpectedException('RuntimeException');
 
-        Workable::create()->callRestfulService('test');
+        Workable::create()->callHttpClient('test');
     }
 
     public function testThrowsIfNoApiKey()
@@ -37,7 +48,7 @@ class WorkableTest extends SapphireTest
         Environment::setEnv('WORKABLE_API_KEY', null);
         $this->setExpectedException('RuntimeException');
 
-        Workable::create()->callRestfulService('test');
+        Workable::create()->callHttpClient('test');
     }
 
     public function testConvertsSnakeCase()
