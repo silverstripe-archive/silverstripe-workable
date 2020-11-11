@@ -9,8 +9,11 @@ SilverStripe\Core\Injector\Injector:
       defaultLifetime: 3600
   SilverStripe\Workable\Workable:
     constructor:
-      0: %$WorkableRestfulService
-      1: %$Psr\SimpleCache\CacheInterface.workable
-  WorkableRestfulService:
+      0: '%$GuzzleHttp\ClientInterface.workable'
+      1: '%$Psr\SimpleCache\CacheInterface.workable'
+  SilverStripe\Workable\WorkableRestfulServiceFactory:
+    constructor:
+      apikey: '`WORKABLE_API_KEY`'
+  GuzzleHttp\ClientInterface.workable:
     class: GuzzleHttp\Client
     factory: SilverStripe\Workable\WorkableRestfulServiceFactory

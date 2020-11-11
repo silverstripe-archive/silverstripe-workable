@@ -2,10 +2,11 @@
 
 namespace SilverStripe\Workable;
 
+use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\ClientException;
 use Monolog\Logger;
 use RuntimeException;
 use Psr\Log\LoggerInterface;
-use SilverStripe\Core\Convert;
 use SilverStripe\ORM\ArrayList;
 use SilverStripe\Core\Flushable;
 use SilverStripe\View\ArrayData;
@@ -22,25 +23,31 @@ class Workable implements Flushable
     use Configurable;
 
     /**
-     * Reference to the RestfulService dependency
-     * @var RestfulService
+     * Reference to the HTTP Client dependency
+     * @var ClientInterface
      */
-    protected $restfulService;
+    private $httpClient;
 
     /**
      * Reference to the Cache dependency
      * @var CacheInterface
      */
-    protected $cache;
+    private $cache;
+
+    /**
+     * Subdomain for Workable API call (e.g. $subdomain.workable.com)
+     * @config
+     */
+    private static $subdomain;
 
     /**
      * Constructor, inject the restful service dependency
-     * @param RestfulService $restfulService
+     * @param ClientInterface $httpClient
      * @param CacheInterface $cache
      */
-    public function __construct($restfulService, $cache)
+    public function __construct(ClientInterface $httpClient, CacheInterface $cache)
     {
-        $this->restfulService = $restfulService;
+        $this->httpClient = $httpClient;
         $this->cache = $cache;
     }
 
@@ -50,7 +57,7 @@ class Workable implements Flushable
      *                        see https://workable.readme.io/docs/jobs for full list of query params
      * @return ArrayList
      */
-    public function getJobs($params = [])
+    public function getJobs(array $params = []): ArrayList
     {
         $cacheKey = 'Jobs' . implode('-', $params);
         if ($this->cache->has($cacheKey)) {
@@ -58,15 +65,18 @@ class Workable implements Flushable
         }
 
         $list = ArrayList::create();
-        $response = $this->callRestfulService('jobs', $params);
+        $response = $this->callHttpClient('jobs', $params);
 
-        if ($response && isset($response['jobs']) && is_array($response['jobs'])) {
-            foreach ($response['jobs'] as $record) {
-                $list->push(WorkableResult::create($record));
-            }
-
-            $this->cache->set($cacheKey, $list);
+        if (!$response) {
+            return $list;
         }
+
+        $jobs = $response['jobs'] ?? [];
+        foreach ($jobs as $record) {
+            $list->push(WorkableResult::create($record));
+        }
+
+        $this->cache->set($cacheKey, $list);
 
         return $list;
     }
@@ -78,7 +88,7 @@ class Workable implements Flushable
      *                           see https://workable.readme.io/docs/jobs for full list of query params
      * @return WorkableResult|null
      */
-    public function getJob($shortcode, $params = [])
+    public function getJob(string $shortcode, array $params = []): ?WorkableResult
     {
         $cacheKey = 'Job-' . $shortcode . implode('-', $params);
 
@@ -87,7 +97,7 @@ class Workable implements Flushable
         }
 
         $job = null;
-        $response = $this->callRestfulService('jobs/' . $shortcode, $params);
+        $response = $this->callHttpClient('jobs/' . $shortcode, $params);
 
         if ($response && isset($response['id'])) {
             $job = WorkableResult::create($response);
@@ -114,16 +124,19 @@ class Workable implements Flushable
         }
 
         $list = ArrayList::create();
-        $response = $this->callRestfulService('jobs', $params);
+        $response = $this->callHttpClient('jobs', $params);
 
-        if ($response && isset($response['jobs']) && is_array($response['jobs'])) {
-            foreach ($response['jobs'] as $record) {
-                $job = $this->getJob($record['shortcode'], $params);
-                $list->push($job);
-            }
-
-            $this->cache->set($cacheKey, $list);
+        if (!$response) {
+            return $list;
         }
+
+        $jobs = $response['jobs'] ?? [];
+        foreach ($jobs as $record) {
+            $job = $this->getJob($record['shortcode'], $params);
+            $list->push($job);
+        }
+
+        $this->cache->set($cacheKey, $list);
 
         return $list;
     }
@@ -133,29 +146,56 @@ class Workable implements Flushable
      * @param  string $url
      * @param  array  $params
      * @param  string $method
+     *
+     * @throws RuntimeException if client is not configured correctly
+     * @throws ClientException if request fails
+     *
      * @return array  JSON as array
      */
-    public function callRestfulService($url, $params = [], $method = 'GET')
+    public function callHttpClient(string $url, array $params = [], string $method = 'GET'): array
     {
         try {
-            $response = $this->restfulService->request($method, $url, ['query' => $params]);
+            $response = $this->httpClient->request($method, $url, ['query' => $params]);
         } catch (\RuntimeException $e) {
             Injector::inst()->get(LoggerInterface::class)->warning(
                 'Failed to retrieve valid response from workable',
                 ['exception' => $e]
             );
-            return [];
+
+            throw $e;
         }
 
         return json_decode($response->getBody(), true);
     }
 
     /**
-     * Clear the cache when flush is called
+     * Flush any cached data
      */
     public static function flush()
     {
-        $cache = Injector::inst()->get(CacheInterface::class . '.workable');
-        $cache->clear();
+        static::singleton()->getCache()->clear();
+    }
+
+    /**
+     * @return CacheInterface
+     */
+    public function getCache(): CacheInterface
+    {
+        if (!$this->cache) {
+            $this->setCache(Injector::inst()->get(CacheInterface::class . '.workable'));
+        }
+
+        return $this->cache;
+    }
+
+    /**
+     * @param CacheInterface $cache
+     * @return self
+     */
+    public function setCache(CacheInterface $cache): self
+    {
+        $this->cache = $cache;
+
+        return $this;
     }
 }
