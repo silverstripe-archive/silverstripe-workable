@@ -38,7 +38,7 @@ class Workable implements Flushable
      * Subdomain for Workable API call (e.g. $subdomain.workable.com)
      * @config
      */
-    private $subdomain;
+    private static $subdomain;
 
     /**
      * Constructor, inject the restful service dependency
