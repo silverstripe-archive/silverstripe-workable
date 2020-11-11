@@ -173,7 +173,7 @@ class Workable implements Flushable
      */
     public static function flush()
     {
-        static::singleton()->getCache()->clear();
+        Injector::inst()->get(CacheInterface::class . '.workable')->clear();
     }
 
     /**

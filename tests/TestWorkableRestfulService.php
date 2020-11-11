@@ -2,11 +2,12 @@
 
 namespace SilverStripe\Workable\Tests;
 
+use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
 
-class TestWorkableRestfulService
+class TestWorkableRestfulService extends Client
 {
-    public function request($method, $url, $params = [])
+    public function request($method, $url = '', $params = [])
     {
         switch ($url) {
             case 'jobs':
