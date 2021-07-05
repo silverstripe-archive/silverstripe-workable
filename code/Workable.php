@@ -165,6 +165,23 @@ class Workable implements Flushable
             throw $e;
         }
 
+
+         // remaining retries within the current interval.
+         $remainingRequests = $response->getHeader('X-Rate-Limit-Remaining');
+         $sleepInterval = 10;
+ 
+         // If we hit the rate-limit, let's back off and try again
+         if ($remainingRequests === 0 || $response->getStatusCode() === 429) {
+             $nextIntervalTimestamp = $response->getHeader('X-Rate-Limit-Reset');
+             if (!empty($nextIntervalTimestamp)) {
+                 time_sleep_until($nextIntervalTimestamp);
+            } else {
+                // or wait roughly until the next interval.
+                sleep($sleepInterval);
+            }
+            return $this->callRestfulService($url, $params, $method);
+        }
+
         return json_decode($response->getBody(), true);
     }
 
