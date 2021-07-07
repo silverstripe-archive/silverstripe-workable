@@ -1,12 +1,19 @@
 ---
 Name: workable
 ---
-Workable:
-  cache_expiry: 3600
-Injector:
-  Workable:    
+SilverStripe\Core\Injector\Injector:
+  Psr\SimpleCache\CacheInterface.workable:
+    factory: SilverStripe\Core\Cache\CacheFactory
     constructor:
-      0: %$WorkableRestfulService
-  WorkableRestfulService:
-    class: RestfulService
-    factory: WorkableRestfulServiceFactory
+      namespace: 'workable'
+      defaultLifetime: 3600
+  SilverStripe\Workable\Workable:
+    constructor:
+      0: '%$GuzzleHttp\ClientInterface.workable'
+      1: '%$Psr\SimpleCache\CacheInterface.workable'
+  SilverStripe\Workable\WorkableRestfulServiceFactory:
+    constructor:
+      apikey: '`WORKABLE_API_KEY`'
+  GuzzleHttp\ClientInterface.workable:
+    class: GuzzleHttp\Client
+    factory: SilverStripe\Workable\WorkableRestfulServiceFactory

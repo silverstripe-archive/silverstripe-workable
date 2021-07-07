@@ -1,113 +1,236 @@
 <?php
 
-/**
- * Defines the Workable API wrapper
- *
- * @package  silverstripe/workable
- * @author  Aaron Carlino <aaron@silverstripe.com>
- */
-class Workable extends Object {
+namespace SilverStripe\Workable;
 
-	/**
-	 * Reference to the RestfulService dependency
-	 * @var RestfulService
-	 */
-	protected $restulService;
+use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\RequestException;
+use Psr\Log\LoggerInterface;
+use SilverStripe\ORM\ArrayList;
+use SilverStripe\Core\Flushable;
+use SilverStripe\Core\Extensible;
+use Psr\SimpleCache\CacheInterface;
+use SilverStripe\Core\Injector\Injector;
+use SilverStripe\Core\Config\Configurable;
+use SilverStripe\Core\Injector\Injectable;
 
-	/**
-	 * Constructor, inject the restful service dependency
-	 * @param RestfulService $restfulService
-	 */
-	public function __construct($restfulService) {
-		$this->restfulService = $restfulService;
+class Workable implements Flushable
+{
+    use Extensible;
+    use Injectable;
+    use Configurable;
 
-		parent::__construct();
-	}
+    /**
+     * Reference to the HTTP Client dependency
+     * @var ClientInterface
+     */
+    private $httpClient;
 
-	/**
-	 * Gets all the jobs from the Workable API
-	 * @param  array  $params Array of params, e.g. ['state' => 'published']
-	 * @return ArrayList
-	 */
-	public function getJobs($params = []) {
-		$list = ArrayList::create();
-		$response = $this->callRestfulService('jobs', $params);
+    /**
+     * Reference to the Cache dependency
+     * @var CacheInterface
+     */
+    private $cache;
 
-		if($response && isset($response['jobs']) && is_array($response['jobs'])) {			
-			foreach($response['jobs'] as $record) {
-				$list->push(Workable_Result::create($record));
-			}
-		}
+    /**
+     * Subdomain for Workable API call (e.g. $subdomain.workable.com)
+     * @config
+     */
+    private static $subdomain;
 
-		return $list;
-	}
+    /**
+     * Constructor, inject the restful service dependency
+     * @param ClientInterface $httpClient
+     * @param CacheInterface $cache
+     */
+    public function __construct(ClientInterface $httpClient, CacheInterface $cache)
+    {
+        $this->httpClient = $httpClient;
+        $this->cache = $cache;
+    }
 
-	/**
-	 * Wrapper method to configure the RestfulService, make the call, and handle errors
-	 * @param  string $url    
-	 * @param  array  $params 
-	 * @param  string $method 
-	 * @return array         JSON
-	 */
-	protected function callRestfulService($url, $params = [], $method = 'GET') {
-		$this->restfulService->setQueryString($params);
-		$response = $this->restfulService->request($url, $method, $params);
-		
-		if(!$response) {
-			SS_Log::log('No response from workable API endpoint ' . $url, SS_Log::WARN);
-			
-			return false;				
-		}
-		else if($response->getStatusCode() !== 200) {
-			SS_Log::log("Received non-200 status code {$response->getStatusCode()} from workable API", SS_Log::WARN);
+    /**
+     * Gets all the jobs from the Workable API
+     * @param  array  $params Array of params, e.g. ['state' => 'published'].
+     *                        see https://workable.readme.io/docs/jobs for full list of query params
+     * @return ArrayList
+     */
+    public function getJobs(array $params = []): ArrayList
+    {
+        $cacheKey = 'Jobs' . implode('-', $params);
+        if ($this->cache->has($cacheKey)) {
+            return $this->cache->get($cacheKey);
+        }
 
-			return false;
-		}
+        $list = ArrayList::create();
+        $response = $this->callWorkableApi('jobs', $params);
 
-		return Convert::json2array($response->getBody());
-	}
+        if (!$response) {
+            return $list;
+        }
 
-}
+        $jobs = $response['jobs'] ?? [];
+        foreach ($jobs as $record) {
+            $list->push(WorkableResult::create($record));
+        }
 
+        $this->cache->set($cacheKey, $list);
 
-/**
- * Defines the renderable Workable data for the template. Converts UpperCamelCase properties
- * to the snake_case that comes from the API
- */
-class Workable_Result extends ViewableData {
+        return $list;
+    }
 
-	/**
-	 * Raw data from the API
-	 * @var array
-	 */
-	protected $apiData;
+    /**
+     * Gets information on a specific job form the Workable API
+     * @param  string $shortcode Workable shortcode for the job, e.g. 'GROOV005'
+     * @param  array  $params    Array of params, e.g. ['state' => 'published'].
+     *                           see https://workable.readme.io/docs/jobs for full list of query params
+     * @return WorkableResult|null
+     */
+    public function getJob(string $shortcode, array $params = []): ?WorkableResult
+    {
+        $cacheKey = 'Job-' . $shortcode . implode('-', $params);
 
-	/**
-	 * Magic getter that converts SilverStripe $UpperCamelCase to snake_case
-	 * e.g. $FullTitle gets full_title. You can also use dot-separated syntax, e.g. $Location.City
-	 * @param  string $prop
-	 * @return mixed
-	 */
-	public function __get($prop) {		
-		$snaked = ltrim(strtolower(preg_replace('/[A-Z]/', '_$0', $prop)), '_');			
+        if ($this->cache->has($cacheKey)) {
+            return $this->cache->get($cacheKey);
+        }
 
-		if(!isset($this->apiData[$snaked])) {			
-			return null;
-		}
-		$data = $this->apiData[$snaked];
+        $job = null;
+        $response = $this->callWorkableApi('jobs/' . $shortcode, $params);
 
-		if(is_array($this->apiData[$snaked])) {
-			return new Workable_Result($data);
-		}
+        if ($response && isset($response['id'])) {
+            $job = WorkableResult::create($response);
+            $this->cache->set($cacheKey, $job);
+        }
 
-		return $data;
-	}
+        return $job;
+    }
 
-	/**
-	 * constructor
-	 * @param array $apiData 
-	 */
-	public function __construct($apiData = []) {
-		$this->apiData = $apiData;
-	}
+    /**
+     * Gets all the jobs from the workable API, populating each job with its full data
+     * Note: This calls the API multiple times so should be used with caution
+     * @param  array  $params Array of params, e.g. ['state' => 'published'].
+     *                        see https://workable.readme.io/docs/jobs for full list of query params
+     * @return ArrayList
+     */
+    public function getFullJobs($params = [])
+    {
+        $cacheKey = 'FullJobs' . implode('-', $params);
+
+        if ($this->cache->has($cacheKey)) {
+            return $this->cache->get($cacheKey);
+        }
+
+        $list = ArrayList::create();
+        $response = $this->callWorkableApi('jobs', $params);
+
+        if (!$response) {
+            return $list;
+        }
+
+        $jobs = $response['jobs'] ?? [];
+        foreach ($jobs as $record) {
+            $job = $this->getJob($record['shortcode'], $params);
+            $list->push($job);
+        }
+
+        $this->cache->set($cacheKey, $list);
+
+        return $list;
+    }
+
+    /**
+     * Sends request to Workable API.
+     * Should it exceed the rate limit, this is caught and put to sleep until the next interval. 
+     * The interval duration is provided by Workable via a header. 
+     * When its awaken, it will call itself again, this repeats until its complete.
+     * This returns a json body from the response.
+     * 
+     * Note: See rate limit docs from Workable https://workable.readme.io/docs/rate-limits
+     * @param  string $url
+     * @param  array  $params
+     * @param  string $method
+     *
+     * @throws RequestException if client is not configured correctly, handles 429 error
+
+     * @return array  JSON as array
+     */
+    public function callWorkableApi(string $url, array $params = [], string $method = 'GET'): array
+    {
+        try {
+            $response = $this->httpClient->request($method, $url, ['query' => $params]);
+            return json_decode($response->getBody(), true);
+        } 
+        catch(RequestException $e){
+            if($e->hasResponse()){
+                $errorResponse = $e->getResponse();
+                $statusCode = $errorResponse->getStatusCode();
+
+                if($statusCode === 429) {
+                    Injector::inst()->get(LoggerInterface::class)->info(
+                        'Rate limit exceeded - sleeping until next interval'
+                    );
+
+                    $this->sleepUntil($errorResponse->getHeader('X-Rate-Limit-Reset'));
+
+                    return $this->callWorkableApi($url, $params, $method);
+                }
+                else {
+                    Injector::inst()->get(LoggerInterface::class)->warning(
+                        'Failed to retrieve valid response from workable',
+                        ['exception' => $e]
+                    );
+
+                    throw $e;
+                }
+            }
+        }
+    }
+
+    /**
+     * Sleeps until the next interval. 
+     * Should the interval header be empty, the script sleeps for 10 seconds - Workable's default interval.
+     * @param array $resetIntervalHeader
+     */
+    private function sleepUntil($resetIntervalHeader){
+        $defaultSleepInterval = 10;
+
+        if(!empty($resetIntervalHeader)){
+            time_sleep_until($resetIntervalHeader[0]);
+        }
+        else {
+            sleep($defaultSleepInterval);
+        }
+    }
+
+    /**
+     * Flush any cached data
+     */
+    public static function flush()
+    {
+        Injector::inst()->get(CacheInterface::class . '.workable')->clear();
+    }
+
+    /**
+     * Gets any cached data. If there is no cached data, a blank cache is created.
+     * @return CacheInterface
+     */
+    public function getCache(): CacheInterface
+    {
+        if (!$this->cache) {
+            $this->setCache(Injector::inst()->get(CacheInterface::class . '.workable'));
+        }
+
+        return $this->cache;
+    }
+
+    /**
+     * Sets the cache.
+     * @param CacheInterface $cache
+     * @return self
+     */
+    public function setCache(CacheInterface $cache): self
+    {
+        $this->cache = $cache;
+
+        return $this;
+    }
 }

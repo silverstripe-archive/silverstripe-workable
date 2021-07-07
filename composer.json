@@ -1,20 +1,25 @@
 {
-	"name":"silverstripe/workable",
-	"type": "silverstripe-module",
-	"description": "Adds Workable API integration to SilverStripe projects",
-	"keywords": ["silverstripe"],
-	"license": "BSD-3-Clause",
-	"homepage": "https://github.com/silverstripe/workable/",
-	"require": {
-        	"silverstripe/framework": ">=3.1.0",
-        	"php": ">=5.4"
-	},
-	"authors":[
-		{
-			"name": "Aaron Carlino",
-			"homepage": "http://leftandmain.com",
-			"email" : "aaron@silverstripe.com"
-		}
-
-	]
+  "name":"silverstripe/workable",
+  "type": "silverstripe-vendormodule",
+  "description": "Adds Workable API integration to SilverStripe projects",
+  "keywords": ["silverstripe"],
+  "license": "BSD-3-Clause",
+  "homepage": "https://github.com/silverstripe/workable/",
+  "require": {
+    "silverstripe/framework": "^4",
+    "guzzlehttp/guzzle": "^6",
+    "php": ">=7.1"
+  },
+  "authors":[
+    {
+      "name": "Aaron Carlino",
+      "homepage": "http://leftandmain.com",
+      "email" : "aaron@silverstripe.com"
+    },
+    {
+      "name": "Torque Foxes",
+      "homepage": "https://github.com/torque-foxes",
+      "email" : "torque-foxues@silverstripe.com"
+    }
+  ]
 }

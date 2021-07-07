@@ -1,41 +1,78 @@
 <?php
 
-class TestWorkableRestfulService extends RestfulService {
+namespace SilverStripe\Workable\Tests;
 
-	public $params = [];
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Response;
 
-	public function setQueryString($params = NULL) {
-		$this->params = $params;
-	}
+class TestWorkableRestfulService extends Client
+{
+    public function request($method, $url = '', $params = [])
+    {
+        switch ($url) {
+            case 'jobs':
+                return $this->getMockJobs($params);
+            case 'jobs/GROOV001':
+            case 'jobs/GROOV002':
+                return $this->getMockJob($url, $params);
+        }
+    }
 
+    protected function getMockJobs($params)
+    {
+        $state = isset($params['query']['state']) ? $params['query']['state'] : '';
+        $response = [];
 
-	public function request($subURL = '', $method = "GET", $data = null, $headers = null, $curlOptions = array()) {
-		switch($subURL) {
-			case 'jobs':
-				if($this->params['state'] === 'published') {
-					return new RestfulService_Response(
-						json_encode(['jobs' => [
-							['title' => 'Published Job 1'],
-							['title' => 'Published Job 2'],
-							['title' => 'Published Job 3']
-						]]),
-						200
-					);
-				}
-				if($this->params['state'] === 'draft') {
-					return new RestfulService_Response(
-						json_encode(['jobs' => [
-							['title' => 'Draft Job 1']
-						]]),
-						200
-					);					
-				}
-				if($this->params['state'] === 'fail') {
-					return new RestfulService_Response('FAIL', 404);
-				}
-			break;
-		}
+        switch ($state) {
+            case 'draft':
+                $response = ['jobs' => [
+                    [
+                        'title' => 'draft job',
+                        'shortcode' => 'GROOV001',
+                    ],
+                ]];
+                break;
+            default:
+                $response = ['jobs' => [
+                    [
+                        'title' => 'Job 1',
+                        'shortcode' => 'GROOV001',
+                    ],
+                    [
+                        'title' => 'Job 2',
+                        'shortcode' => 'GROOV002',
+                    ],
+                ]];
+                break;
+        }
 
-	}
+        return new Response(200, [], json_encode($response));
+    }
 
+    protected function getMockJob($url, $params)
+    {
+        $state = isset($params['query']['state']) ? $params['query']['state'] : '';
+        $response = [];
+
+        switch ($state) {
+            case 'draft':
+                $response = [
+                    'title' => 'Draft Job x',
+                    'test' => 'full draft data',
+                    'id' => 1,
+                    'shortcode' => substr($url, 5),
+                ];
+                break;
+            default:
+                $response = [
+                    'title' => 'Job x',
+                    'test' => 'full data',
+                    'id' => 1,
+                    'shortcode' => substr($url, 5),
+                ];
+                break;
+        }
+
+        return new Response(200, [], json_encode($response));
+    }
 }

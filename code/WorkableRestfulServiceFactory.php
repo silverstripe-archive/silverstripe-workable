@@ -1,48 +1,59 @@
 <?php
 
+namespace SilverStripe\Workable;
+
+use GuzzleHttp\ClientInterface;
+use RuntimeException;
+use SilverStripe\Workable\Workable;
+use SilverStripe\Core\Injector\Factory;
+
 /**
  * Factory to build a RestfulService object for workable. This is needed for three reasons:
  *
  * - It sets the $apiKey by preferring the constant, but falling back on the config layer
  * - RestfulService needs a URL in its constructor, and this is a computed value based on the
  *   static workable API base URL plus the user's subdomain
- * - It makes various boilerplate configurations to RestfulService, e.g. cache expiry, auth headers.
+ * - It makes various boilerplate configurations to RestfulService, e.g. auth headers.
  */
-class WorkableRestfulServiceFactory implements SilverStripe\Framework\Injector\Factory {
+class WorkableRestfulServiceFactory implements Factory
+{
+    /**
+     * Set via ENV variable WORKABLE_API_KEY (see config.yml)
+     * @var string
+     */
+    private $apiKey;
 
-	/**
-	 * Create the RestfulService (or whatever dependency you've injected)
-	 * @param  string $service 
-	 * @param  array  $params 
-	 * @return RestfulService
-	 */
-    public function create($service, array $params = []) {;
-    	$config = Workable::config();
-    	$subdomain = $config->subdomain;
+    public function __construct(?string $apiKey)
+    {
+        $this->apiKey = $apiKey;
+    }
+    /**
+     * Create the RestfulService (or whatever dependency you've injected)
+     *
+     * @throws RuntimeException
+     *
+     * @return ClientInterface
+     */
+    public function create($service, array $params = [])
+    {
 
-    	if(!$subdomain) {
-    		throw new RuntimeException('You must set a Workable subdomain in the config (Workable.subdomain)');
-    	}
-
-        $rest = new $service(
-        	sprintf('https://www.workable.com/spi/v3/accounts/%s/',$subdomain),
-        	$config->cache_expiry
-        );
-
-        if(defined('WORKABLE_API_KEY')) {
-        	$apiKey = WORKABLE_API_KEY;
-        }
-        else {
-        	$apiKey = Config::inst()->get('Workable','apiKey');
+        if (!$this->apiKey) {
+            throw new RuntimeException('WORKABLE_API_KEY Environment variable not set');
         }
 
-        if(!$apiKey) {
-        	throw new RuntimeException('You must define an API key for Workable. Either use the WORKABLE_API_KEY constant or set Workable.apiKey in the config');
+        $subdomain = Workable::config()->subdomain;
+
+        if (!$subdomain) {
+            throw new RuntimeException(
+                'You must set a Workable subdomain in the config (SilverStripe\Workable\Workable.subdomain)'
+            );
         }
 
-        $rest->httpHeader("Authorization:Bearer $apiKey");
-        $rest->httpHeader("Content-Type: application/json");
-        
-        return $rest;
+        return new $service([
+            'base_uri' => sprintf('https://%s.workable.com/spi/v3/', $subdomain),
+            'headers' => [
+                'Authorization' => sprintf('Bearer %s', $this->apiKey),
+            ],
+        ]);
     }
 }
